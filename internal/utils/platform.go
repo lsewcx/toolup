@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/host"
@@ -45,11 +46,19 @@ func GetOSInfo() (OSInfo, error) {
 		return OSInfo{}, fmt.Errorf("获取系统信息: %w", err)
 	}
 
-	return OSInfo{
+	result := OSInfo{
 		OS:             info.OS,
 		Arch:           info.KernelArch,
 		Distro:         info.Platform,
 		Family:         info.PlatformFamily,
 		PackageManager: detectPackageManager(info.Platform, info.PlatformFamily),
-	}, nil
+	}
+	slog.Debug("系统信息检测完成",
+		"os", result.OS,
+		"distro", result.Distro,
+		"family", result.Family,
+		"arch", result.Arch,
+		"package_manager", result.PackageManager)
+
+	return result, nil
 }
