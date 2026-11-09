@@ -1,0 +1,18 @@
+# Build output
+dist/
+/toolup
+/toolup.exe
+
+# Go test and coverage artifacts
+*.test
+*.out
+coverage.*
+
+# Local environment files
+.env
+.env.*
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
