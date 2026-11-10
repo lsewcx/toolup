@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -32,8 +34,11 @@ func TestInstallFallsBackToScript(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("官方安装脚本只支持 Linux/macOS")
 	}
-	// 清空 PATH，确保不会因为本机已安装 uv 而跳过安装。
-	t.Setenv("PATH", t.TempDir())
+
+	// 构造一个只有 curl 的 PATH：uv 不存在，下载工具存在。
+	path := t.TempDir()
+	writeExecutable(t, filepath.Join(path, "curl"))
+	t.Setenv("PATH", path)
 
 	runner := &fakeRunner{}
 	if err := Install(context.Background(), "uv", runner); err != nil {
@@ -48,14 +53,40 @@ func TestInstallFallsBackToScript(t *testing.T) {
 	if got.name != "sh" || len(got.args) != 2 || got.args[0] != "-c" {
 		t.Fatalf("call = %#v, want sh -c <script>", got)
 	}
-	if !strings.Contains(got.args[1], "https://astral.sh/uv/install.sh") {
-		t.Errorf("script does not install uv:\n%s", got.args[1])
+	for _, want := range []string{"curl -LsSf", "https://astral.sh/uv/install.sh", "| sh"} {
+		if !strings.Contains(got.args[1], want) {
+			t.Errorf("script does not contain %q:\n%s", want, got.args[1])
+		}
+	}
+}
+
+func TestInstallFailsWithoutDownloader(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("官方安装脚本只支持 Linux/macOS")
+	}
+
+	// PATH 里既没有 uv，也没有 curl/wget。
+	t.Setenv("PATH", t.TempDir())
+
+	err := Install(context.Background(), "uv", &fakeRunner{})
+	if err == nil {
+		t.Fatal("expected an error when curl and wget are both missing")
+	}
+	if !strings.Contains(err.Error(), "curl") || !strings.Contains(err.Error(), "wget") {
+		t.Errorf("error should mention curl and wget: %v", err)
 	}
 }
 
 func TestInstallRejectsUnknownTool(t *testing.T) {
 	if err := Install(context.Background(), "unknown-tool", &fakeRunner{}); err == nil {
 		t.Fatal("expected an error for an unknown tool")
+	}
+}
+
+func writeExecutable(t *testing.T, path string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 }
 

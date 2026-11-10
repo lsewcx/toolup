@@ -21,7 +21,7 @@ type ScriptInstaller struct {
 	// URL 是官方安装脚本的地址。
 	URL string
 
-	// LookPath 用于检测工具是否已在 PATH 中，默认使用 exec.LookPath。
+	// LookPath 用于检测命令是否存在，默认使用 exec.LookPath。
 	// 抽成字段是为了方便测试时替换。
 	LookPath func(string) (string, error)
 }
@@ -47,9 +47,22 @@ func (s *ScriptInstaller) Install(ctx context.Context) error {
 		return nil
 	}
 
-	// 使用官方安装命令：curl -LsSf <script> | sh
-	command := fmt.Sprintf("curl -LsSf %s | sh", s.URL)
-	slog.Info("使用官方脚本安装", "tool", s.Tool, "script", s.URL)
+	downloader, err := detectDownloader(lookPath)
+	if err != nil {
+		slog.Warn("缺少下载工具，无法安装 "+s.Tool,
+			"hint", "请先安装 curl 或 wget，例如：apt install curl 或 dnf install wget")
+		return err
+	}
+
+	// 有 curl 时优先使用 curl，否则回退到 wget 下载官方安装脚本。
+	var command string
+	if downloader == "curl" {
+		command = fmt.Sprintf("curl -LsSf %s | sh", s.URL)
+	} else {
+		command = fmt.Sprintf("wget -qO- %s | sh", s.URL)
+	}
+
+	slog.Info("使用官方脚本安装", "tool", s.Tool, "script", s.URL, "downloader", downloader)
 	if err := s.Runner.Run(ctx, "sh", "-c", command); err != nil {
 		return fmt.Errorf("安装 %s 失败: %w", s.Tool, err)
 	}
@@ -58,4 +71,15 @@ func (s *ScriptInstaller) Install(ctx context.Context) error {
 	// 但当前进程的 PATH 不会随之更新，因此这里提示用户重新加载配置。
 	slog.Info("安装完成，如果当前终端找不到该命令，请重新打开终端或重新加载 shell 配置", "tool", s.Tool)
 	return nil
+}
+
+// detectDownloader 返回当前系统可用的下载工具，优先 curl，其次 wget。
+// 两者都不存在时返回提示安装的错误。
+func detectDownloader(lookPath func(string) (string, error)) (string, error) {
+	for _, name := range []string{"curl", "wget"} {
+		if _, err := lookPath(name); err == nil {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("未找到 curl 或 wget，请先安装其中之一后重试（例如：apt install curl 或 dnf install wget）")
 }
