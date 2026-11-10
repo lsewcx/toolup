@@ -14,3 +14,14 @@ func TestLookupGit(t *testing.T) {
 		}
 	}
 }
+
+func TestLookupUV(t *testing.T) {
+	tool, ok := Lookup("uv")
+	if !ok {
+		t.Fatal("uv should be registered")
+	}
+
+	if tool.InstallScript != "https://astral.sh/uv/install.sh" {
+		t.Errorf("uv install script = %q, want official installer", tool.InstallScript)
+	}
+}

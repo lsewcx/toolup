@@ -21,15 +21,23 @@ func Install(ctx context.Context, toolName string, runner execx.Runner) error {
 		return fmt.Errorf("检测系统信息: %w", err)
 	}
 
-	pkg, ok := tool.Packages[info.PackageManager]
-	if !ok {
-		return fmt.Errorf("工具 %s 不支持包管理器 %s", toolName, info.PackageManager)
+	// 优先使用系统包管理器；包管理器未收录该工具时回退到官方安装脚本。
+	if pkg, ok := tool.Packages[info.PackageManager]; ok {
+		inst, err := installer.New(info.PackageManager, runner)
+		if err != nil {
+			return err
+		}
+		return inst.Install(ctx, pkg)
 	}
 
-	inst, err := installer.New(info.PackageManager, runner)
-	if err != nil {
-		return err
+	if tool.InstallScript != "" {
+		script := &installer.ScriptInstaller{
+			Runner: runner,
+			Tool:   tool.Name,
+			URL:    tool.InstallScript,
+		}
+		return script.Install(ctx)
 	}
 
-	return inst.Install(ctx, pkg)
+	return fmt.Errorf("工具 %s 不支持包管理器 %s", toolName, info.PackageManager)
 }
