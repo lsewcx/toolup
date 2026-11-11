@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"runtime"
 
 	"github.com/lsewcx/toolup/internal/execx"
 	"github.com/lsewcx/toolup/internal/installer"
@@ -30,6 +31,29 @@ func Install(ctx context.Context, toolName string, runner execx.Runner) error {
 		return inst.Install(ctx, pkg)
 	}
 
+	// 没有安装脚本、只提供官方二进制压缩包的工具（例如 ossutil 2.0）。
+	if tool.InstallArchive != nil {
+		archive := tool.InstallArchive
+		platform := runtime.GOOS + "/" + runtime.GOARCH
+		artifact, ok := archive.Artifacts[platform]
+		if !ok {
+			return fmt.Errorf("工具 %s 不支持当前平台 %s", toolName, platform)
+		}
+
+		inst := &installer.ArchiveInstaller{
+			Runner:     runner,
+			Tool:       tool.Name,
+			Version:    archive.Version,
+			URL:        artifact.URL,
+			SHA256:     artifact.SHA256,
+			Binary:     archive.Binary,
+			InstallDir: archive.InstallDir,
+			Symlink:    archive.Symlink,
+		}
+		return inst.Install(ctx)
+	}
+
+	// 官方安装脚本。
 	if tool.InstallScript != "" {
 		script := &installer.ScriptInstaller{
 			Runner: runner,
