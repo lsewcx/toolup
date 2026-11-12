@@ -56,9 +56,12 @@ func Install(ctx context.Context, toolName string, runner execx.Runner) error {
 	// 官方安装脚本。
 	if tool.InstallScript != "" {
 		script := &installer.ScriptInstaller{
-			Runner: runner,
-			Tool:   tool.Name,
-			URL:    tool.InstallScript,
+			Runner:         runner,
+			Tool:           tool.Name,
+			URL:            tool.InstallScript,
+			LatestURL:      tool.InstallScriptLatestURL,
+			Shell:          tool.InstallScriptShell,
+			InstalledPaths: tool.InstallScriptInstalledPaths,
 		}
 		return script.Install(ctx)
 	}

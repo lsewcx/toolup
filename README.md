@@ -10,6 +10,7 @@
 - 统一命令安装：`toolup install <tool>`
 - 智能选择安装方式：包管理器优先，其次官方安装脚本 / 官方二进制压缩包
 - 脚本安装自动选择 `curl` 或 `wget`，两者都缺失时输出 warning 提示安装
+- 脚本安装支持指定 shell（如 nvm 需要 `bash`），支持解析并安装最新版本，并按安装文件判断是否已安装
 - 二进制压缩包安装会校验官方 SHA256，并用内置解压逻辑处理，无需额外安装 `unzip`
 - 通过脚本或压缩包安装的工具已安装时自动跳过，可重复执行
 - 结构化日志 + 彩色输出，支持 `NO_COLOR` 与调试模式
@@ -20,11 +21,12 @@
 | --- | --- | --- |
 | Debian / Ubuntu / Linux Mint / Pop!_OS / Kali | apt | ✅ |
 | Fedora / RHEL / CentOS / Rocky Linux / AlmaLinux | dnf | ✅ |
-| macOS | - | 脚本 / 压缩包类工具可用（如 uv、ossutil） |
+| macOS | - | 脚本 / 压缩包类工具可用（如 uv、ossutil、nvm） |
 | Windows | - | ❌ 暂不支持 |
 
 - 通过包管理器安装时，非 root 用户会自动使用 `sudo`；脚本或压缩包安装需要 root 权限时同样会提权
 - ossutil 2.0 支持 Linux / macOS 的 386、amd64、arm、arm64 平台
+- nvm 需要 `bash`，可在 Linux / macOS / WSL 使用
 - 从源码构建需要 Go 1.26+
 
 ## 已支持的工具
@@ -34,6 +36,7 @@
 | [git](https://git-scm.com/) | apt-get / dnf | 系统包管理器安装 |
 | [uv](https://docs.astral.sh/uv/) | 官方安装脚本 | 优先 `curl`，回退 `wget`；已安装则跳过 |
 | [ossutil](https://www.alibabacloud.com/help/zh/oss/developer-reference/ossutil-overview/) | 官方二进制压缩包（2.4.1） | 校验 SHA256，安装到 `/usr/local/bin/ossutil` 并软链 `/usr/bin/ossutil`；需要 `sudo` |
+| [nvm](https://github.com/nvm-sh/nvm) | 官方安装脚本（自动最新） | 安装前解析 GitHub 最新 release；需要 `bash`；安装到 `~/.nvm` 并写入 shell 配置；按 `nvm.sh` 判断是否已安装 |
 
 ## 安装 toolup
 
@@ -68,6 +71,8 @@ toolup install <tool>
 ```bash
 toolup install git
 toolup install uv
+toolup install ossutil
+toolup install nvm
 ```
 
 安装 uv 时的输出示例：
@@ -97,6 +102,21 @@ toolup install ossutil
 
 > ossutil 的下载地址与 SHA256 均取自阿里云官方文档；升级版本时需要同步更新工具目录中的版本、地址和校验和。
 
+安装 nvm（需要 `bash`，每次安装都会解析 GitHub 最新 release）：
+
+```bash
+toolup install nvm
+```
+
+`toolup` 会先请求 `https://github.com/nvm-sh/nvm/releases/latest`，解析出最新 tag 后下载对应版本的官方安装脚本并执行，因此不会固定在某个旧版本。nvm 会安装到 `~/.nvm`（设置了 `XDG_CONFIG_HOME` 时为 `$XDG_CONFIG_HOME/nvm`），并自动把加载配置写入 shell 配置文件。安装完成后请重新打开终端或执行 `source ~/.bashrc`（zsh 为 `source ~/.zshrc`），然后用以下命令验证：
+
+```bash
+command -v nvm   # 输出 nvm 即成功；nvm 是 shell 函数，which nvm 无效
+nvm install --lts
+```
+
+> uv 的官方脚本地址本身不带版本号，因此每次安装同样是最新版本。工具已安装时默认跳过；如需把已安装的 nvm 升级到最新，可重新执行官方安装脚本（`toolup` 的跳过逻辑详见「工作原理」）。
+
 ## 工作原理
 
 执行 `toolup install <tool>` 时：
@@ -104,7 +124,7 @@ toolup install ossutil
 1. 在工具目录（catalog）中查找该工具；
 2. 检测系统信息，得到发行版与包管理器；
 3. 若工具声明了当前包管理器的包名，走包管理器安装（apt / dnf，必要时 `sudo`）；
-4. 否则若工具声明了官方安装脚本地址，下载并执行官方脚本（优先 `curl`，其次 `wget`）；
+4. 否则若工具声明了官方安装脚本地址，下载并执行官方脚本（优先 `curl`，其次 `wget`；按工具要求使用 `sh` 或 `bash`；声明了最新版本地址时先解析最新版本号）；
 5. 否则若工具声明了官方二进制压缩包，下载、校验 SHA256、解压并安装（必要时 `sudo`）；
 6. 都没有则提示不支持。
 
@@ -117,7 +137,7 @@ toolup install ossutil
 │   ├── app/                  # 安装流程编排
 │   ├── execx/                # 命令执行封装（含 sudo 提权）
 │   ├── installer/            # apt / dnf / 官方脚本 / 官方压缩包安装器
-│   │   └── catalog/          # 工具目录（git、uv、ossutil）
+│   │   └── catalog/          # 工具目录（git、uv、ossutil、nvm）
 │   ├── logging/              # slog + tint 日志初始化
 │   └── utils/                # 系统与包管理器检测
 ├── main.go

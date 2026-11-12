@@ -29,6 +29,35 @@ func TestLookupUV(t *testing.T) {
 	}
 }
 
+func TestLookupNVM(t *testing.T) {
+	tool, ok := Lookup("nvm")
+	if !ok {
+		t.Fatal("nvm should be registered")
+	}
+
+	wantURL := "https://raw.githubusercontent.com/nvm-sh/nvm/{version}/install.sh"
+	if tool.InstallScript != wantURL {
+		t.Errorf("nvm install script = %q, want %q", tool.InstallScript, wantURL)
+	}
+	wantLatestURL := "https://github.com/nvm-sh/nvm/releases/latest"
+	if tool.InstallScriptLatestURL != wantLatestURL {
+		t.Errorf("nvm latest URL = %q, want %q", tool.InstallScriptLatestURL, wantLatestURL)
+	}
+	if tool.InstallScriptShell != "bash" {
+		t.Errorf("nvm install shell = %q, want bash", tool.InstallScriptShell)
+	}
+
+	wantPaths := []string{"$HOME/.nvm/nvm.sh", "$XDG_CONFIG_HOME/nvm/nvm.sh"}
+	if len(tool.InstallScriptInstalledPaths) != len(wantPaths) {
+		t.Fatalf("nvm installed paths = %#v, want %#v", tool.InstallScriptInstalledPaths, wantPaths)
+	}
+	for i := range wantPaths {
+		if tool.InstallScriptInstalledPaths[i] != wantPaths[i] {
+			t.Errorf("nvm installed path[%d] = %q, want %q", i, tool.InstallScriptInstalledPaths[i], wantPaths[i])
+		}
+	}
+}
+
 func TestLookupOssutil(t *testing.T) {
 	tool, ok := Lookup("ossutil")
 	if !ok {

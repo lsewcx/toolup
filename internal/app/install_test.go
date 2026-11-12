@@ -35,9 +35,10 @@ func TestInstallFallsBackToScript(t *testing.T) {
 		t.Skip("官方安装脚本只支持 Linux/macOS")
 	}
 
-	// 构造一个只有 curl 的 PATH：uv 不存在，下载工具存在。
+	// 构造一个只有 curl 和 sh 的 PATH：uv 不存在，下载工具和 shell 存在。
 	path := t.TempDir()
 	writeExecutable(t, filepath.Join(path, "curl"))
+	writeExecutable(t, filepath.Join(path, "sh"))
 	t.Setenv("PATH", path)
 
 	runner := &fakeRunner{}
@@ -57,6 +58,26 @@ func TestInstallFallsBackToScript(t *testing.T) {
 		if !strings.Contains(got.args[1], want) {
 			t.Errorf("script does not contain %q:\n%s", want, got.args[1])
 		}
+	}
+}
+
+func TestInstallNVMSkipsWhenInstalled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.MkdirAll(filepath.Join(home, ".nvm"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".nvm", "nvm.sh"), []byte("# nvm\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+
+	runner := &fakeRunner{}
+	if err := Install(context.Background(), "nvm", runner); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("calls = %#v, want no calls when nvm is installed", runner.calls)
 	}
 }
 

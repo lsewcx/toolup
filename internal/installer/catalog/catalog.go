@@ -9,6 +9,16 @@ type Tool struct {
 	// 当工具的 Packages 未收录当前包管理器时（例如 Debian/Ubuntu 没有 uv），
 	// 会回退到官方脚本安装，从而在不同发行版上保持一致。
 	InstallScript string
+	// InstallScriptLatestURL 非空时，先请求该地址（跟随重定向）解析最新版本号，
+	// 并用它替换 InstallScript 中的 {version} 占位符。
+	// 例如 https://github.com/nvm-sh/nvm/releases/latest。
+	InstallScriptLatestURL string
+	// InstallScriptShell 是执行 InstallScript 使用的 shell，为空时默认 sh。
+	// 官方脚本要求 bash 时（例如 nvm）需要显式指定。
+	InstallScriptShell string
+	// InstallScriptInstalledPaths 是判断工具是否已安装的文件路径列表，支持环境变量。
+	// 适用于安装后不是普通可执行文件的工具（例如 nvm 是 shell 函数）。
+	InstallScriptInstalledPaths []string
 	// InstallArchive 描述通过官方二进制压缩包安装的方式，
 	// 适用于只提供压缩包、没有安装脚本的工具（例如 ossutil 2.0）。
 	InstallArchive *Archive
@@ -38,6 +48,7 @@ var registry = map[string]Tool{
 	"git":     gitTool,
 	"uv":      uvTool,
 	"ossutil": ossutilTool,
+	"nvm":     nvmTool,
 }
 
 func Lookup(name string) (Tool, bool) {
